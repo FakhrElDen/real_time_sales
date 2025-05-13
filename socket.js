@@ -1,82 +1,45 @@
-const http = require('http');
-const socketio = require('socket.io');
-const Redis = require('ioredis');
+// socket.js (ES Module)
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import Redis from 'ioredis';
 
-// Create an HTTP server instance
-const server = http.createServer();
+// Create HTTP server
+const server = createServer();
 
-// Create a Socket.io instance with CORS enabled for any origin
-const io = socketio(server, {
+// Initialize Socket.io
+const io = new Server(server, {
     cors: {
         origin: '*',
     },
 });
 
-// Connect to Redis server on port 6379 and host "redis"
-// const redisEvents = new Redis(6379, 'redis');
-const redis = new Redis();
+// Connect to Redis
+const redis = new Redis(6379, '127.0.0.1');
 
-
-// Handle connection event for each client
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
-
-    // Handle subscription to the channel
-    socket.on('subscribe', (channel) => {
-        if (channel === 'settlement') {
-            redis.get("settlement").then((result) => {
-                // Send a message upon subscription
-                socket.emit('settlement', { count: result });
-            });
-        }
-        else if (channel === 'transfers') {
-            redis.get("transfers").then((result) => {
-                // Send a message upon subscription
-                socket.emit('transfers', { count: result });
-            });
-        }
-        else if (channel === 'inventory') {
-            redis.get("inventory").then((result) => {
-                // Send a message upon subscription
-                socket.emit('inventory', { count: result });
-            });
-        }
-    });
 });
 
-// Subscribe to the "orders_count" channel in Redis
-redisEvents.subscribe('orders-updates', (error, count) => {
+// Subscribe to Laravel Redis broadcasts (note channel name should be 'orders-updates')
+redis.subscribe('orders-updates', (error, analytic) => {
     if (error) {
         console.error('Error subscribing to Redis channel:', error);
         return;
     }
-
-    console.log(`successfully subscribed to ${count} channels`);
+    console.log(`Subscribed to ${analytic} channel(s)`);
 });
 
-// Listen for messages on the subscribed channel
-redisEvents.on('message', (channel, message) => {
+redis.on('message', (channel, message) => {
+    console.log(`Message from ${channel}:`, message);
     try {
-        // Parse the received message as JSON
-        let data = JSON.parse(message).data;
-
-        console.error(`message received on ${channel} channel`);
-        let counts_array = data.count ?? (data.orders_count ?? data.batches_count);
-        console.error({
-            channel: channel,
-            action: data.action,
-            counts: Array.isArray(counts_array) ? counts_array.map(function (item) { return { corridor_id: item.corridor_id, count: item.count }; }) : counts_array
-        });
-
-        // Emit the order count update to the specific client based on user ID and event
-        io.emit(`${channel}`, data);
-
+        const payload = JSON.parse(message);
+        io.emit('orders-updates', payload);
     } catch (error) {
-        console.error('Error processing message:', error);
+        console.error('Invalid message format', error);
     }
 });
 
-// Start the server on port 3000
+// Start server
 server.listen(3000, () => {
-    console.log('Socket.IO server listening on port 3000');
+    console.log('Socket.IO server running on port 3000');
 });

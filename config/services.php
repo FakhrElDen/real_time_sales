@@ -38,4 +38,12 @@ return [
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
     ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+    ],
+
+    'weather' => [
+       'key' => env('OPENWEATHER_API_KEY'),
+    ],
 ];
